@@ -1,0 +1,84 @@
+{
+  "portfolios": [
+    {
+      "id": "preset-core-satellite",
+      "name": "Core & Satellite Growth Portfolio",
+      "description": "Balanced foundation with Flexi Cap + Large & Mid Cap",
+      "createdAt": "2026-10-18T09:12:53.069Z",
+      "items": [
+        {
+          "fundId": "ppfas-flexi-cap",
+          "investmentAmount": 50000,
+          "weight": 0.5
+        },
+        {
+          "fundId": "mirae-large-midcap",
+          "investmentAmount": 50000,
+          "weight": 0.5
+        }
+      ]
+    },
+    {
+      "id": "preset-aggressive-growth",
+      "name": "Aggressive Equity Basket",
+      "description": "Index anchor + Mid Cap + Small Cap growth engines",
+      "createdAt": "2026-10-18T09:12:53.078Z",
+      "items": [
+        {
+          "fundId": "uti-nifty-50-index",
+          "investmentAmount": 40000,
+          "weight": 0.4
+        },
+        {
+          "fundId": "kotak-emerging-equity",
+          "investmentAmount": 30000,
+          "weight": 0.3
+        },
+        {
+          "fundId": "nippon-small-cap",
+          "investmentAmount": 30000,
+          "weight": 0.3
+        }
+      ]
+    }
+  ],
+  "customFunds": [
+    {
+      "name": "Utkarsh",
+      "amc": "My Custom Basket",
+      "category": "Flexi Cap",
+      "riskRating": "Custom",
+      "aum": 1000,
+      "nav": 100,
+      "expenseRatio": 0.5,
+      "cagr3Y": 15,
+      "benchmark": "NIFTY 500 TRI",
+      "holdings": [
+        {
+          "stock": "Reliance Industries Ltd",
+          "ticker": "RELIANCE",
+          "sector": "Healthcare",
+          "marketCap": "Large Cap",
+          "weight": 15.1
+        },
+        {
+          "stock": "HDFC Bank Ltd",
+          "ticker": "HDFCBANK",
+          "sector": "Financial Services",
+          "marketCap": "Large Cap",
+          "weight": 15.1
+        },
+        {
+          "stock": "Infosys Ltd",
+          "ticker": "INFY",
+          "sector": "Technology",
+          "marketCap": "Large Cap",
+          "weight": 10.1
+        }
+      ],
+      "id": "custom-utkarsh-1792319189731",
+      "isCustom": true,
+      "createdAt": "2026-10-18T10:26:29.731Z"
+    }
+  ]
+}
