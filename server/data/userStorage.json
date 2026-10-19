@@ -79,6 +79,29 @@
       "id": "custom-utkarsh-1792319189731",
       "isCustom": true,
       "createdAt": "2026-10-18T10:26:29.731Z"
+    },
+    {
+      "name": "Utkarsh",
+      "amc": "My Custom Basket",
+      "category": "Flexi Cap",
+      "riskRating": "Custom",
+      "aum": 1000,
+      "nav": 100,
+      "expenseRatio": 0.5,
+      "cagr3Y": 15,
+      "benchmark": "NIFTY 500 TRI",
+      "holdings": [
+        {
+          "stock": "Reliance Industries Ltd",
+          "ticker": "RELIANCE",
+          "sector": "Energy / Oil & Gas",
+          "marketCap": "Large Cap",
+          "weight": 15.1
+        }
+      ],
+      "id": "custom-utkarsh-1792411858325",
+      "isCustom": true,
+      "createdAt": "2026-10-19T12:10:58.325Z"
     }
   ]
 }

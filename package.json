@@ -1,0 +1,23 @@
+{
+  "name": "mutual-fund-overlap-calculator",
+  "version": "1.0.0",
+  "description": "Full-Stack MERN Mutual Fund Overlap Calculator and Pre-Purchase Simulation Engine",
+  "scripts": {
+    "build": "npm install --prefix server && npm install --prefix client && npm run build --prefix client",
+    "build:client": "npm run build --prefix client",
+    "start": "node server/server.js",
+    "server": "node server/server.js",
+    "client": "npm run dev --prefix client",
+    "dev:server": "node --watch server/server.js"
+  },
+  "keywords": [
+    "mutual-fund",
+    "overlap-calculator",
+    "simulation",
+    "mern",
+    "investing",
+    "portfolio"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
