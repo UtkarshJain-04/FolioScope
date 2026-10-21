@@ -33,6 +33,14 @@ export default function Header({
         {/* Navigation Tabs */}
         <nav className="nav-tabs">
           <button
+            className={`nav-tab-btn ${activeTab === 'xray' ? 'active' : ''}`}
+            onClick={() => setActiveTab('xray')}
+            id="tab-xray"
+          >
+            <Activity size={16} />
+            <span>Portfolio X-Ray</span>
+          </button>
+          <button
             className={`nav-tab-btn ${activeTab === 'simulator' ? 'active' : ''}`}
             onClick={() => setActiveTab('simulator')}
             id="tab-simulator"

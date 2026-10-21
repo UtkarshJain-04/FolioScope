@@ -16,6 +16,7 @@ import { simulateProspectivePurchase } from './services/simulationEngine.js';
 import { PortfolioStore, CustomFundStore } from './services/dbStore.js';
 import { parseCasText } from './services/casParser.js';
 import { SetuService } from './services/setuService.js';
+import { generatePortfolioXRay } from './services/xrayEngine.js';
 import {
   generatePersonalizedAiRecommendation,
   chatWithFinancialAdvisor,
@@ -178,6 +179,32 @@ app.post('/api/overlap/portfolio', (req, res) => {
 });
 
 // 5. PRE-PURCHASE WHAT-IF SIMULATION ENGINE
+
+// 4.1 Standalone Portfolio X-Ray (Look-Through Stocks, Diversification Health, Expense & Waste Analysis)
+app.post('/api/portfolio/xray', (req, res) => {
+  try {
+    const { items } = req.body; // [{ fundId, investmentAmount, weight }]
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'Portfolio items array is required' });
+    }
+
+    const portfolioItems = items.map(item => {
+      const fund = getFundById(item.fundId);
+      return fund ? { fund, investmentAmount: Number(item.investmentAmount) || 0, weight: Number(item.weight) || 0 } : null;
+    }).filter(Boolean);
+
+    if (portfolioItems.length === 0) {
+      return res.status(404).json({ success: false, message: 'No valid funds found in portfolio' });
+    }
+
+    const xray = generatePortfolioXRay(portfolioItems);
+    res.json({ success: true, data: xray });
+  } catch (error) {
+    console.error('Portfolio X-Ray Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 app.post('/api/overlap/simulate', (req, res) => {
   try {
     const { currentPortfolio, prospectiveFundId, prospectiveAmount, prospectiveWeight } = req.body;

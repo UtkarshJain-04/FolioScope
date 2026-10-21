@@ -1,6 +1,50 @@
 // Simulation Engine: Calculates Before vs After Portfolio Overlap & Concentration
 import { normalizeStockIdentifier, calculatePairwiseOverlap, aggregatePortfolioHoldings } from './overlapCalculator.js';
 
+// Shared Diversification Score & Severity Logic
+export function calculateDiversificationScore({
+  overlapWeight = 0,
+  highRiskStocksCount = 0,
+  bonusPoints = 0
+}) {
+  let score = 100;
+  // Direct overlap deduction (higher overlap = lower score)
+  score -= (overlapWeight * 0.9);
+  // Over-concentration penalty
+  score -= (highRiskStocksCount * 6);
+  // Bonus for adding new unique stocks
+  score += bonusPoints;
+  return Math.max(10, Math.min(98, Math.round(score)));
+}
+
+export function getOverlapSeverityTier(overlapPercentage) {
+  if (overlapPercentage <= 15) {
+    return {
+      severityTier: 'Low Overlap',
+      description: 'Excellent Diversifier (Low Overlap)',
+      badgeColor: 'emerald'
+    };
+  } else if (overlapPercentage <= 32) {
+    return {
+      severityTier: 'Moderate Overlap',
+      description: 'Moderate Overlap (Balanced Addition)',
+      badgeColor: 'cyan'
+    };
+  } else if (overlapPercentage <= 48) {
+    return {
+      severityTier: 'Elevated Overlap',
+      description: 'Elevated Overlap (High Redundancy)',
+      badgeColor: 'amber'
+    };
+  } else {
+    return {
+      severityTier: 'Excessive Duplication',
+      description: 'Excessive Duplication (Duplicate Exposure)',
+      badgeColor: 'rose'
+    };
+  }
+}
+
 export function simulateProspectivePurchase({ currentPortfolioItems, prospectiveFund, prospectiveAmount = 0, prospectiveWeight = 0 }) {
   if (!prospectiveFund) {
     throw new Error('Prospective fund is required for simulation');
@@ -179,30 +223,19 @@ export function simulateProspectivePurchase({ currentPortfolioItems, prospective
   }).sort((a, b) => b.afterPct - a.afterPct);
 
   // 8. Diversification Score & Recommendation Algorithm
-  // Factors:
-  // - Direct overlap penalty (0 to 50 pts deducted based on overlap %)
-  // - Concentration penalty (deduct if any stock > 8%)
-  // - New stocks bonus (+10 to +25 pts for bringing in 8+ new stocks)
-  // - Category variety bonus
-  let diversificationScore = 100;
-
-  // Direct overlap deduction (higher overlap = lower score)
-  diversificationScore -= (directOverlapWeight * 0.9);
-
-  // Over-concentration penalty
   const highRiskStocks = detailedStockShifts.filter(s => s.afterWeight >= 8);
-  if (highRiskStocks.length > 0) {
-    diversificationScore -= (highRiskStocks.length * 6);
-  }
-
-  // Bonus for adding new unique stocks
+  let bonusPoints = 0;
   if (brandNewStocks.length >= 10) {
-    diversificationScore += 12;
+    bonusPoints = 12;
   } else if (brandNewStocks.length >= 5) {
-    diversificationScore += 6;
+    bonusPoints = 6;
   }
 
-  diversificationScore = Math.max(10, Math.min(98, Math.round(diversificationScore)));
+  const diversificationScore = calculateDiversificationScore({
+    overlapWeight: directOverlapWeight,
+    highRiskStocksCount: highRiskStocks.length,
+    bonusPoints
+  });
 
   // Risk Rating & Diagnosis
   let riskLevel = 'Low Overlap';

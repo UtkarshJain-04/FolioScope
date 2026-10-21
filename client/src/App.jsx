@@ -8,6 +8,7 @@ import AddCustomFundModal from './components/AddCustomFundModal';
 import CasUploadModal from './components/CasUploadModal';
 import SetuAccountAggregatorModal from './components/SetuAccountAggregatorModal';
 import AIAdvisorView from './components/AIAdvisorView';
+import XRayView from './components/XRayView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('simulator');
@@ -211,7 +212,20 @@ export default function App() {
           </div>
         ) : (
           <>
-            {activeTab === 'simulator' && (
+                        {activeTab === 'xray' && (
+              <XRayView
+                currentPortfolio={currentPortfolio}
+                onOpenCasModal={() => setIsCasModalOpen(true)}
+                onOpenSetuModal={() => setIsSetuModalOpen(true)}
+                onNavigateToSimulator={(fundId) => {
+                  if (fundId) setProspectiveFundId(fundId);
+                  setActiveTab('simulator');
+                }}
+                onNavigateToAdvisor={() => setActiveTab('advisor')}
+              />
+            )}
+
+{activeTab === 'simulator' && (
               <SimulatorView
                 funds={funds}
                 currentPortfolio={currentPortfolio}
