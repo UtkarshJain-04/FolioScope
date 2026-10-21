@@ -8,6 +8,7 @@ export default function Header({
   fundsCount,
   onOpenCustomModal,
   onOpenCasModal,
+  onOpenSetuModal,
   onLoadPreset,
   portfolios = []
 }) {
@@ -59,6 +60,28 @@ export default function Header({
           </button>
 
           <button
+            className={`nav-tab-btn ${activeTab === 'advisor' ? 'active' : ''}`}
+            onClick={() => setActiveTab('advisor')}
+            id="tab-advisor"
+          >
+            <Sparkles size={16} style={{ color: 'var(--lime-accent)' }} />
+            <span>AI Advisor</span>
+            <span
+              style={{
+                fontSize: '0.62rem',
+                background: 'var(--lime-accent)',
+                color: 'var(--bg-dark)',
+                padding: '1px 5px',
+                borderRadius: '8px',
+                fontWeight: 900,
+                marginLeft: '4px'
+              }}
+            >
+              AI
+            </span>
+          </button>
+
+          <button
             className={`nav-tab-btn ${activeTab === 'catalog' ? 'active' : ''}`}
             onClick={() => setActiveTab('catalog')}
             id="tab-catalog"
@@ -88,12 +111,29 @@ export default function Header({
             </select>
           )}
 
-          {/* Upload CAS Statement */}
+          {/* Setu Account Aggregator Direct Sign-in */}
           <button
             className="btn btn-primary btn-sm"
+            onClick={onOpenSetuModal}
+            title="Directly Sign-in and Fetch Mutual Funds via Setu Account Aggregator"
+            style={{
+              fontWeight: 800,
+              background: 'var(--lime-accent)',
+              color: 'var(--bg-dark)',
+              boxShadow: '0 0 14px rgba(205, 255, 35, 0.4), 2px 2px 0px var(--olive-dark)',
+              border: '1px solid var(--lime-accent)'
+            }}
+          >
+            <Sparkles size={14} />
+            <span>Connect Setu AA</span>
+          </button>
+
+          {/* Upload CAS Statement */}
+          <button
+            className="btn btn-secondary btn-sm"
             onClick={onOpenCasModal}
             title="Upload CAS (CAMS/KFintech) Statement"
-            style={{ fontWeight: 800 }}
+            style={{ fontWeight: 700 }}
           >
             <Upload size={14} />
             <span>Upload CAS</span>

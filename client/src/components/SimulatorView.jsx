@@ -16,10 +16,11 @@ import {
   ChevronDown,
   Layers,
   ArrowUpRight,
-  Upload
+  Upload,
+  Download
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-
+import { downloadPortfolioReport } from '../utils/pdfReport';
 export default function SimulatorView({
   funds,
   currentPortfolio,
@@ -30,7 +31,9 @@ export default function SimulatorView({
   isSimulating,
   onRunSimulation,
   onOpenCasModal,
-  onOpenCustomModal
+  onOpenCustomModal,
+  onOpenSetuModal,
+  onNavigateToAdvisor
 }) {
   const [stockFilter, setStockFilter] = useState('all'); // all, overlapping, new, alerts
   const [stockSearch, setStockSearch] = useState('');
@@ -133,6 +136,40 @@ export default function SimulatorView({
         </div>
 
         <div style={{ display: 'flex', gap: '10px' }}>
+          {/* <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}> */}
+          <button
+            className="btn btn-secondary"
+            onClick={() =>
+              downloadPortfolioReport({
+                funds,
+                currentPortfolio,
+                prospectiveFundId,
+                prospectiveAmount,
+                simulationResult
+              })
+            }
+            disabled={!simulationResult || isSimulating}
+            title="Download your portfolio analysis as a PDF"
+          >
+            <Download size={16} />
+            <span>Download PDF Report</span>
+          </button>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              onRunSimulation(prospectiveFundId, prospectiveAmount);
+              handleCelebrateIfLow();
+            }}
+            id="btn-recalculate-simulation"
+            disabled={isSimulating}
+          >
+            <Sparkles size={16} />
+            <span>
+              {isSimulating ? 'Simulating...' : 'Recalculate Simulation'}
+            </span>
+          </button>
+          {/* </div> */}
           <button
             className="btn btn-primary"
             onClick={() => {
@@ -166,12 +203,28 @@ export default function SimulatorView({
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 className="btn btn-primary btn-sm"
+                onClick={onOpenSetuModal}
+                title="Directly link your mutual funds via Setu Account Aggregator"
+                style={{
+                  fontSize: '0.72rem',
+                  padding: '5px 10px',
+                  background: 'var(--lime-accent)',
+                  color: 'var(--bg-dark)',
+                  fontWeight: 800,
+                  border: '1px solid var(--lime-accent)'
+                }}
+              >
+                <Sparkles size={13} />
+                <span>Setu AA</span>
+              </button>
+              <button
+                className="btn btn-secondary btn-sm"
                 onClick={onOpenCasModal}
                 title="Upload CAS PDF/CSV to auto-import all your mutual funds"
-                style={{ fontSize: '0.72rem', padding: '5px 10px' }}
+                style={{ fontSize: '0.72rem', padding: '5px 9px' }}
               >
                 <Upload size={13} />
-                <span>Upload CAS</span>
+                <span>CAS</span>
               </button>
               <button
                 className="btn btn-secondary btn-sm"
@@ -183,6 +236,41 @@ export default function SimulatorView({
                 <span>Manual</span>
               </button>
             </div>
+          </div>
+
+          {/* Setu AA Instant Connect Callout Banner */}
+          <div
+            style={{
+              background: 'rgba(205, 255, 35, 0.05)',
+              border: '1px solid rgba(205, 255, 35, 0.25)',
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 12px',
+              marginBottom: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+              <span style={{ color: 'var(--lime-accent)', fontSize: '1rem' }}>⚡</span>
+              <span style={{ fontSize: '0.73rem', color: 'var(--text-secondary)' }}>
+                Directly sign-in via <strong>Setu Account Aggregator</strong> to auto-sync your mutual fund folios.
+              </span>
+            </div>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={onOpenSetuModal}
+              style={{
+                fontSize: '0.68rem',
+                padding: '4px 8px',
+                whiteSpace: 'nowrap',
+                color: 'var(--lime-accent)',
+                borderColor: 'var(--lime-accent)'
+              }}
+            >
+              Sign-in & Fetch
+            </button>
           </div>
 
           {/* List of Current Funds */}
@@ -325,6 +413,28 @@ export default function SimulatorView({
                 </option>
               ))}
             </select>
+            {onNavigateToAdvisor && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={onNavigateToAdvisor}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--lime-accent)',
+                    fontSize: '0.74rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                >
+                  <Sparkles size={13} />
+                  <span>Not sure what to buy? Get AI Overlap Recommendation</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Prospective Fund Quick Stats Card */}
@@ -437,24 +547,22 @@ export default function SimulatorView({
             className="glass-panel"
             style={{
               padding: '24px',
-              background: `linear-gradient(135deg, rgba(15, 23, 42, 0.95), ${
-                simulationResult.diagnosis.badgeColor === 'emerald'
-                  ? 'rgba(16, 185, 129, 0.08)'
-                  : simulationResult.diagnosis.badgeColor === 'cyan'
+              background: `linear-gradient(135deg, rgba(15, 23, 42, 0.95), ${simulationResult.diagnosis.badgeColor === 'emerald'
+                ? 'rgba(16, 185, 129, 0.08)'
+                : simulationResult.diagnosis.badgeColor === 'cyan'
                   ? 'rgba(6, 182, 212, 0.08)'
                   : simulationResult.diagnosis.badgeColor === 'amber'
-                  ? 'rgba(245, 158, 11, 0.08)'
-                  : 'rgba(244, 63, 94, 0.08)'
-              })`,
-              borderLeft: `4px solid ${
-                simulationResult.diagnosis.badgeColor === 'emerald'
-                  ? 'var(--emerald-success)'
-                  : simulationResult.diagnosis.badgeColor === 'cyan'
+                    ? 'rgba(245, 158, 11, 0.08)'
+                    : 'rgba(244, 63, 94, 0.08)'
+                })`,
+              borderLeft: `4px solid ${simulationResult.diagnosis.badgeColor === 'emerald'
+                ? 'var(--emerald-success)'
+                : simulationResult.diagnosis.badgeColor === 'cyan'
                   ? 'var(--cyan-primary)'
                   : simulationResult.diagnosis.badgeColor === 'amber'
-                  ? 'var(--amber-warning)'
-                  : 'var(--rose-danger)'
-              }`
+                    ? 'var(--amber-warning)'
+                    : 'var(--rose-danger)'
+                }`
             }}
           >
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', alignItems: 'center' }}>
@@ -489,15 +597,14 @@ export default function SimulatorView({
                     width: '150px',
                     height: '150px',
                     borderRadius: '50%',
-                    background: `conic-gradient(${
-                      simulationResult.metrics.diversificationScore >= 70
-                        ? '#10b981'
-                        : simulationResult.metrics.diversificationScore >= 45
+                    background: `conic-gradient(${simulationResult.metrics.diversificationScore >= 70
+                      ? '#10b981'
+                      : simulationResult.metrics.diversificationScore >= 45
                         ? '#06b6d4'
                         : simulationResult.metrics.diversificationScore >= 30
-                        ? '#f59e0b'
-                        : '#f43f5e'
-                    } ${simulationResult.metrics.diversificationScore * 3.6}deg, rgba(255, 255, 255, 0.06) 0deg)`,
+                          ? '#f59e0b'
+                          : '#f43f5e'
+                      } ${simulationResult.metrics.diversificationScore * 3.6}deg, rgba(255, 255, 255, 0.06) 0deg)`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -788,8 +895,8 @@ export default function SimulatorView({
                           background: stock.alertLevel === 'critical'
                             ? 'rgba(244, 63, 94, 0.05)'
                             : stock.alertLevel === 'warning'
-                            ? 'rgba(245, 158, 11, 0.05)'
-                            : 'transparent'
+                              ? 'rgba(245, 158, 11, 0.05)'
+                              : 'transparent'
                         }}
                       >
                         {/* Company */}

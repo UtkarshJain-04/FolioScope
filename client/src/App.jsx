@@ -6,6 +6,8 @@ import ComparatorView from './components/ComparatorView';
 import CatalogView from './components/CatalogView';
 import AddCustomFundModal from './components/AddCustomFundModal';
 import CasUploadModal from './components/CasUploadModal';
+import SetuAccountAggregatorModal from './components/SetuAccountAggregatorModal';
+import AIAdvisorView from './components/AIAdvisorView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('simulator');
@@ -26,6 +28,32 @@ export default function App() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
   const [isCasModalOpen, setIsCasModalOpen] = useState(false);
+  const [isSetuModalOpen, setIsSetuModalOpen] = useState(false);
+  const [initialSetuConsentId, setInitialSetuConsentId] = useState('');
+
+  // Auto-detect Setu AA return callback or popup message
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const consentId = params.get('setu_consent_id') || params.get('consent_id') || params.get('id');
+    const isCallbackPath = ['/callback', '/success'].includes(window.location.pathname);
+    
+    if (consentId || isCallbackPath) {
+      if (consentId) setInitialSetuConsentId(consentId);
+      setIsSetuModalOpen(true);
+      // Clean query params and reset path to root without full page reload
+      window.history.replaceState({}, document.title, '/');
+    }
+
+    const handleMessage = (event) => {
+      if (event.data?.type === 'SETU_CONSENT_APPROVED' && event.data?.consentId) {
+        setInitialSetuConsentId(event.data.consentId);
+        setIsSetuModalOpen(true);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   // Fetch initial funds catalog and saved portfolios
   useEffect(() => {
@@ -135,6 +163,13 @@ export default function App() {
     setActiveTab('simulator');
   };
 
+  // Handle import from Setu Account Aggregator
+  const handleImportFromSetu = (importedItems) => {
+    if (!importedItems || importedItems.length === 0) return;
+    setCurrentPortfolio(importedItems);
+    setActiveTab('simulator');
+  };
+
   // Handle new custom fund added
   const handleCustomFundAdded = (newFund) => {
     setFunds(prev => [newFund, ...prev]);
@@ -151,6 +186,7 @@ export default function App() {
         fundsCount={funds.length}
         onOpenCustomModal={() => setIsCustomModalOpen(true)}
         onOpenCasModal={() => setIsCasModalOpen(true)}
+        onOpenSetuModal={() => setIsSetuModalOpen(true)}
         onLoadPreset={handleLoadPreset}
         portfolios={portfolios}
       />
@@ -187,6 +223,8 @@ export default function App() {
                 onRunSimulation={runSimulation}
                 onOpenCasModal={() => setIsCasModalOpen(true)}
                 onOpenCustomModal={() => setIsCustomModalOpen(true)}
+                onOpenSetuModal={() => setIsSetuModalOpen(true)}
+                onNavigateToAdvisor={() => setActiveTab('advisor')}
               />
             )}
 
@@ -201,6 +239,15 @@ export default function App() {
               <ComparatorView
                 funds={funds}
                 onSelectForSimulation={handleSelectForSimulation}
+              />
+            )}
+
+            {activeTab === 'advisor' && (
+              <AIAdvisorView
+                funds={funds}
+                currentPortfolio={currentPortfolio}
+                onSelectForSimulation={handleSelectForSimulation}
+                onAddToPortfolio={handleAddToPortfolio}
               />
             )}
 
@@ -248,6 +295,17 @@ export default function App() {
         isOpen={isCasModalOpen}
         onClose={() => setIsCasModalOpen(false)}
         onImportToPortfolio={handleImportFromCas}
+      />
+
+      {/* Setu Account Aggregator Direct Sign-in & Ingestion Modal */}
+      <SetuAccountAggregatorModal
+        isOpen={isSetuModalOpen}
+        initialConsentId={initialSetuConsentId}
+        onClose={() => {
+          setIsSetuModalOpen(false);
+          setInitialSetuConsentId('');
+        }}
+        onImportToPortfolio={handleImportFromSetu}
       />
     </div>
   );
