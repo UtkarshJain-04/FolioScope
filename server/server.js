@@ -1,8 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
-import 'dotenv/config';
+import './loadEnv.js';
 import multer from 'multer';
+import mongoose from 'mongoose';
+import passport from 'passport';
+import { randomBytes } from 'crypto';
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
@@ -16,6 +19,13 @@ import { simulateProspectivePurchase } from './services/simulationEngine.js';
 import { PortfolioStore, CustomFundStore } from './services/dbStore.js';
 import { parseCasText } from './services/casParser.js';
 import { SetuService } from './services/setuService.js';
+import { SavedPortfolio } from './models/SavedPortfolio.js';
+import {
+  authenticatedUser,
+  configurePassport,
+  createAuthRouter,
+  createSessionMiddleware,
+} from './services/auth.js';
 import {
   generatePersonalizedAiRecommendation,
   chatWithFinancialAdvisor,
@@ -26,10 +36,57 @@ import {
 const app = express();
 const PORT = process.env.PORT || 5000;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const configuredSessionSecret = process.env.SESSION_SECRET;
+const hasSessionSecret = Boolean(configuredSessionSecret && configuredSessionSecret.length >= 32);
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
 
 app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
+
+let authDatabaseReady = false;
+let mongoClient = null;
+if (mongoUri) {
+  try {
+    await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+    authDatabaseReady = true;
+    mongoClient = mongoose.connection.getClient();
+    console.log('[Auth] Connected to MongoDB.');
+  } catch (error) {
+    console.error('[Auth] MongoDB connection failed; authentication is disabled:', error.message);
+  }
+} else {
+  console.warn('[Auth] MONGODB_URI (or MONGO_URI) is not set; authentication is disabled.');
+}
+
+if (!hasSessionSecret) {
+  console.warn('[Auth] SESSION_SECRET must contain at least 32 characters; authentication is disabled.');
+}
+const googleEnabled = configurePassport();
+if (!googleEnabled) {
+  console.warn('[Auth] Google OAuth credentials are not configured.');
+}
+
+app.use(createSessionMiddleware({
+  mongoClient,
+  sessionSecret: hasSessionSecret ? configuredSessionSecret : randomBytes(32).toString('hex'),
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+app.use('/api/auth', createAuthRouter({
+  isDatabaseReady: () => authDatabaseReady && mongoose.connection.readyState === 1,
+  hasSessionSecret,
+  googleEnabled,
+}));
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health' || req.path === '/setu/webhook' || req.path.startsWith('/auth/')) {
+    return next();
+  }
+  return authenticatedUser(req, res, next);
+});
 
 // Helper to find a fund by ID (checks standard catalog and custom funds)
 function getFundById(fundId) {
@@ -314,35 +371,71 @@ app.get('/api/ai/disclaimer', (req, res) => {
 });
 
 // 6. Portfolios CRUD
-app.get('/api/portfolios', (req, res) => {
+app.get('/api/portfolios', async (req, res) => {
   try {
-    const portfolios = PortfolioStore.getAll();
-    res.json({ success: true, data: portfolios });
+    const presetPortfolios = PortfolioStore.getAll().filter(portfolio => portfolio.id.startsWith('preset-'));
+    const savedPortfolios = await SavedPortfolio.find({ owner: req.user._id }).sort({ createdAt: -1 }).lean();
+    const ownedPortfolios = savedPortfolios.map(portfolio => ({
+      id: portfolio._id.toString(),
+      name: portfolio.name,
+      description: portfolio.description,
+      items: portfolio.items,
+      createdAt: portfolio.createdAt,
+      updatedAt: portfolio.updatedAt,
+    }));
+    res.json({ success: true, data: [...presetPortfolios, ...ownedPortfolios] });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Failed to load user portfolios:', error);
+    res.status(500).json({ success: false, message: 'Could not load portfolios.' });
   }
 });
 
-app.post('/api/portfolios', (req, res) => {
+app.post('/api/portfolios', async (req, res) => {
   try {
     const { name, description, items } = req.body;
     if (!name || !items || !Array.isArray(items)) {
       return res.status(400).json({ success: false, message: 'Portfolio name and items are required' });
     }
 
-    const saved = PortfolioStore.save({ name, description, items });
-    res.json({ success: true, data: saved });
+    const saved = await SavedPortfolio.create({
+      owner: req.user._id,
+      name,
+      description: description || '',
+      items,
+    });
+    res.json({
+      success: true,
+      data: {
+        id: saved._id.toString(),
+        name: saved.name,
+        description: saved.description,
+        items: saved.items,
+        createdAt: saved.createdAt,
+        updatedAt: saved.updatedAt,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Failed to save user portfolio:', error);
+    res.status(500).json({ success: false, message: 'Could not save portfolio.' });
   }
 });
 
-app.delete('/api/portfolios/:id', (req, res) => {
+app.delete('/api/portfolios/:id', async (req, res) => {
   try {
-    PortfolioStore.delete(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(404).json({ success: false, message: 'Portfolio not found' });
+    }
+    const deleted = await SavedPortfolio.findOneAndDelete({
+      _id: req.params.id,
+      owner: req.user._id,
+    });
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Portfolio not found' });
+    }
     res.json({ success: true, message: 'Portfolio deleted successfully' });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    console.error('Failed to delete user portfolio:', error);
+    res.status(500).json({ success: false, message: 'Could not delete portfolio.' });
   }
 });
 
@@ -1140,4 +1233,3 @@ server.on('error', (err) => {
     console.error('Server error:', err);
   }
 });
-

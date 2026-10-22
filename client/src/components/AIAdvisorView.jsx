@@ -53,6 +53,7 @@ export default function AIAdvisorView({
   // AI Recommendation Generation State
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiReport, setAiReport] = useState(null);
+  const [recommendationError, setRecommendationError] = useState('');
   const [selectedCandidateIds, setSelectedCandidateIds] = useState([]);
 
   // Head-to-Head Compare State
@@ -61,7 +62,7 @@ export default function AIAdvisorView({
   const [isComparing, setIsComparing] = useState(false);
   const [comparisonAiResult, setComparisonAiResult] = useState(null);
 
-  // Interactive Groq Chat State
+  // Interactive   Chat State
   const [chatMessages, setChatMessages] = useState([
     {
       sender: 'ai',
@@ -123,6 +124,7 @@ export default function AIAdvisorView({
     }
 
     setIsGenerating(true);
+    setRecommendationError('');
     try {
       const res = await fetch('/api/ai/recommend', {
         method: 'POST',
@@ -140,12 +142,25 @@ export default function AIAdvisorView({
         })
       });
 
-      const data = await res.json();
-      if (data.success) {
-        setAiReport(data.data);
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error('The recommendation service returned an invalid response. Please try again.');
       }
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Could not generate a recommendation. Please try again.');
+      }
+
+      if (!data.data?.aiAnalysis) {
+        throw new Error('The recommendation service returned no analysis. Please try again.');
+      }
+
+      setAiReport(data.data);
     } catch (err) {
       console.error('Error generating AI recommendation:', err);
+      setRecommendationError(err instanceof Error ? err.message : 'Could not generate a recommendation. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -343,19 +358,6 @@ export default function AIAdvisorView({
               <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: '0.95rem', color: 'var(--text-primary)', margin: 0 }}>
                 AI PERSONAL ADVISOR
               </h1>
-              <span
-                style={{
-                  fontSize: '0.65rem',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  background: 'rgba(205, 255, 35, 0.15)',
-                  color: 'var(--lime-accent)',
-                  fontWeight: 700,
-                  border: '1px solid var(--lime-accent)'
-                }}
-              >
-                GROQ GPT-OSS-20B
-              </span>
             </div>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
               Personalized mutual fund recommendations powered by portfolio stock overlap math & investor purpose.
@@ -489,7 +491,7 @@ export default function AIAdvisorView({
           style={{ padding: '8px 16px', fontSize: '0.82rem' }}
         >
           <MessageSquare size={15} />
-          <span>Ask FolioScope AI (Groq Chat)</span>
+          <span>Ask FolioScope AI (  Chat)</span>
         </button>
       </div>
 
@@ -713,7 +715,7 @@ export default function AIAdvisorView({
                 {isGenerating ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
-                    <span>Analyzing Overlap with Groq AI...</span>
+                    <span>Analyzing Overlap with   AI...</span>
                   </>
                 ) : (
                   <>
@@ -723,6 +725,11 @@ export default function AIAdvisorView({
                 )}
               </button>
             </div>
+            {recommendationError && (
+              <p role="alert" style={{ marginTop: '12px', color: 'var(--amber-warning)', fontSize: '0.82rem' }}>
+                {recommendationError}
+              </p>
+            )}
           </div>
 
           {/* STEP 2: Candidate Funds Ranked by Overlap Cards */}
@@ -926,7 +933,7 @@ export default function AIAdvisorView({
             )}
           </div>
 
-          {/* STEP 3: Groq AI Recommendation Output Report */}
+          {/* STEP 3:   AI Recommendation Output Report */}
           {aiReport && (
             <div
               className="card"
@@ -940,7 +947,7 @@ export default function AIAdvisorView({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <Sparkles size={22} style={{ color: 'var(--lime-accent)' }} />
                   <h3 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>
-                    Personalized Groq AI Recommendation Report
+                    Personalized   AI Recommendation Report
                   </h3>
                 </div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--silver-neutral)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -948,6 +955,12 @@ export default function AIAdvisorView({
                   <span style={{ color: 'var(--lime-accent)', fontWeight: 700 }}>{aiReport.modelUsed}</span>
                 </div>
               </div>
+
+              {aiReport.errorNote && (
+                <p role="status" style={{ marginBottom: '16px', color: 'var(--amber-warning)', fontSize: '0.8rem' }}>
+                   AI is unavailable, so this report was generated by the profile-aware offline analysis. Check the server&apos;s   API configuration to enable AI-generated responses.
+                </p>
+              )}
 
               {/* Formatted Markdown Content */}
               <div
@@ -1138,12 +1151,12 @@ export default function AIAdvisorView({
                 {isComparing ? (
                   <>
                     <RefreshCw size={15} className="animate-spin" />
-                    <span>Groq AI Comparing Overlaps...</span>
+                    <span>AI Comparing Overlaps...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles size={15} />
-                    <span>Ask Groq AI to Compare & Pick Winner</span>
+                    <span>Ask AI to Compare & Pick Winner</span>
                   </>
                 )}
               </button>
@@ -1258,7 +1271,7 @@ export default function AIAdvisorView({
       )}
 
       {/* ========================================================= */}
-      {/* TAB 4: ASK FOLIOSCOPE AI (GROQ CHAT)                      */}
+      {/* TAB 4: ASK FOLIOSCOPE AI (  CHAT)                      */}
       {/* ========================================================= */}
       {advisorSubTab === 'chat' && (
         <div className="card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', height: '600px' }}>
@@ -1362,7 +1375,7 @@ export default function AIAdvisorView({
                 }}
               >
                 <RefreshCw size={14} className="animate-spin" style={{ color: 'var(--lime-accent)' }} />
-                <span>Thinking on Groq...</span>
+                <span>Thinking on  ...</span>
               </div>
             )}
           </div>

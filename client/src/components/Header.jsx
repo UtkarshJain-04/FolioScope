@@ -1,5 +1,6 @@
 import React from 'react';
-import { Layers, Activity, Sparkles, Grid, GitCompare, BookOpen, PlusCircle, Upload } from 'lucide-react';
+import logo from '../assets/logo_new.png';
+import { Layers, Activity, Sparkles, Grid, GitCompare, BookOpen, PlusCircle, Upload, Home, LogOut, UserRound } from 'lucide-react';
 
 export default function Header({
   activeTab,
@@ -10,13 +11,17 @@ export default function Header({
   onOpenCasModal,
   onOpenSetuModal,
   onLoadPreset,
-  portfolios = []
+  portfolios = [],
+  user,
+  onLogout,
+  logoutError = ''
 }) {
   return (
     <header className="app-header">
       <div className="container header-content">
         {/* Brand */}
-        <div className="brand-wrapper">
+        <img className="header-logo" src={logo} alt="FolioScope Logo" />
+        {/*<div className="brand-wrapper">
           <div className="brand-logo-icon">
             <Layers size={22} />
           </div>
@@ -28,10 +33,20 @@ export default function Header({
               Mutual Fund Overlap Calculator & Pre-Purchase Simulator
             </p>
           </div>
-        </div>
+        </div>*/}
 
         {/* Navigation Tabs */}
         <nav className="nav-tabs">
+          <button
+            className={`nav-tab-btn ${activeTab === 'home' ? 'active' : ''}`}
+            onClick={() => setActiveTab('home')}
+            id="tab-home"
+            aria-label="Home"
+          >
+            <Home size={16} />
+            <span>Home</span>
+          </button>
+
           <button
             className={`nav-tab-btn ${activeTab === 'simulator' ? 'active' : ''}`}
             onClick={() => setActiveTab('simulator')}
@@ -92,7 +107,21 @@ export default function Header({
         </nav>
 
         {/* Right Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: '10px' }}>
+          <div title={user?.email} style={{ display: 'flex', alignItems: 'center', gap: '7px', color: 'var(--text-secondary)', fontSize: '0.74rem' }}>
+            <UserRound size={15} style={{ color: 'var(--lime-accent)' }} />
+            <span>{user?.displayName || user?.username}</span>
+          </div>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onLogout}
+            title="Sign out of FolioScope"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <LogOut size={14} />
+            <span>Log out</span>
+          </button>
+
           {/* Preset Portfolios Quick Selector */}
           {portfolios.length > 0 && (
             <select
@@ -160,6 +189,11 @@ export default function Header({
           </div>
         </div>
       </div>
+      {logoutError && (
+        <p role="alert" style={{ padding: '6px 20px 0', color: 'var(--rose-danger)', fontSize: '0.72rem', textAlign: 'right' }}>
+          {logoutError}
+        </p>
+      )}
     </header>
   );
 }

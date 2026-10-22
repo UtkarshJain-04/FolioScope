@@ -181,12 +181,15 @@ TASK INSTRUCTIONS:
 Format your output in clean, beautiful Markdown with headers, bold text, and bullet points.`;
 
   try {
-    const response = await client.responses.create({
+    const response = await client.chat.completions.create({
       model: 'openai/gpt-oss-20b',
-      input: prompt,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    const outputText = response.output_text || (response.output && response.output.find(o => o.type === 'message')?.content?.[0]?.text) || '';
+    const outputText = response.choices[0]?.message?.content;
+    if (!outputText) {
+      throw new Error('Groq returned an empty recommendation.');
+    }
 
     return {
       success: true,
@@ -197,7 +200,7 @@ Format your output in clean, beautiful Markdown with headers, bold text, and bul
       disclaimer: LEGAL_DISCLAIMER,
     };
   } catch (error) {
-    console.error('[GroqAiService] Error calling client.responses.create:', error);
+    console.error('[GroqAiService] Error generating recommendation:', error);
     
     // Provide a comprehensive algorithmic fallback so users always get high quality insights
     const fallbackAnalysis = generateFallbackRecommendation({
@@ -252,12 +255,15 @@ INSTRUCTIONS:
 5. Remind them briefly that you provide analytical guidance, and they remain responsible for their investment decisions.`;
 
   try {
-    const response = await client.responses.create({
+    const response = await client.chat.completions.create({
       model: 'openai/gpt-oss-20b',
-      input: prompt,
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    const reply = response.output_text || (response.output && response.output.find(o => o.type === 'message')?.content?.[0]?.text) || 'No response generated.';
+    const reply = response.choices[0]?.message?.content;
+    if (!reply) {
+      throw new Error('Groq returned an empty chat response.');
+    }
 
     return {
       success: true,
@@ -279,34 +285,89 @@ INSTRUCTIONS:
 /**
  * Algorithmic Fallback generator
  */
-function generateFallbackRecommendation({ userProfile, targetCandidates, currentPortfolioItems }) {
-  const { purpose = 'wealth_creation', riskTolerance = 'high', experienceLevel = 'beginner' } = userProfile;
+export function generateFallbackRecommendation({ userProfile = {}, targetCandidates = [], currentPortfolioItems = [] }) {
+  const {
+    purpose = 'wealth_creation',
+    riskTolerance = 'moderate',
+    experienceLevel = 'beginner',
+    timeHorizon = '5-10y',
+    customGoalText = '',
+    specificComparison = false,
+  } = userProfile;
 
-  const lowOverlapFunds = targetCandidates.filter(c => c.overlapPercentage < 20);
-  const highOverlapFunds = targetCandidates.filter(c => c.overlapPercentage >= 40);
+  const goalDetails = {
+    high_risk_high_reward: {
+      label: 'High Risk, High Reward',
+      matches: category => category === 'Small Cap' || category === 'Mid Cap',
+    },
+    wealth_creation: {
+      label: 'Steady Long-Term Wealth',
+      matches: category => ['Flexi Cap', 'Large & Mid Cap', 'Multi Cap'].includes(category),
+    },
+    capital_preservation: {
+      label: 'Capital Preservation / Low Risk',
+      matches: category => category === 'Large Cap' || category === 'Index Fund',
+    },
+    thematic_tech: {
+      label: 'Thematic & Global Tech',
+      matches: category => category.includes('Technology') || category.includes('International'),
+    },
+    custom_goal: {
+      label: customGoalText.trim() || 'Custom Investment Purpose',
+      matches: () => true,
+    },
+  };
+  const goal = goalDetails[purpose] || {
+    label: purpose,
+    matches: () => true,
+  };
 
-  const topPick = (riskTolerance === 'high' 
-    ? targetCandidates.find(c => c.category === 'Small Cap' || c.category === 'Mid Cap')
-    : targetCandidates.find(c => c.overlapPercentage < 20)) || targetCandidates[0];
+  const goalAlignedCandidates = targetCandidates.filter(candidate => goal.matches(candidate.category));
+  const recommendations = (goalAlignedCandidates.length ? goalAlignedCandidates : targetCandidates)
+    .slice(0, 2);
+  const highestOverlapCandidate = targetCandidates.reduce(
+    (highest, candidate) => candidate.overlapPercentage > (highest?.overlapPercentage ?? -1) ? candidate : highest,
+    null
+  );
+  const currentFundNames = currentPortfolioItems.map(item => item.fund.name).filter(Boolean);
+  const riskDescription = {
+    low: 'lower-risk',
+    moderate: 'moderate-risk',
+    high: 'higher-risk',
+  }[riskTolerance] || riskTolerance;
+  const alignmentNote = goalAlignedCandidates.length
+    ? `The selected funds match your **${goal.label}** goal and **${riskDescription}** profile.`
+    : `No candidate in this request matches the usual category for **${goal.label}**; the available options are ranked by overlap instead.`;
+  const recommendationText = recommendations.length
+    ? recommendations.map((candidate, index) => (
+      `${index + 1}. **${candidate.fundName}** (${candidate.category}) — `
+      + `**${candidate.overlapPercentage}% overlap**, ${candidate.newStocksCount} new holdings and `
+      + `${candidate.commonStocksCount} shared holdings.`
+    )).join('\n')
+    : 'No eligible candidate funds were found. Refresh the rankings or clear the selected-fund filter and try again.';
+  const overlapCaution = highestOverlapCandidate?.overlapPercentage >= 40
+    ? `The highest-overlap option is **${highestOverlapCandidate.fundName}** at **${highestOverlapCandidate.overlapPercentage}%**.`
+    : 'None of the funds analyzed has 40% or higher overlap.';
+  const beginnerGuidance = experienceLevel === 'beginner'
+    ? `\n#### Beginner note\nOverlap is the portion of a fund's holdings that duplicates stocks already in your portfolio. Lower overlap can add diversification, but does not remove investment risk.`
+    : `\n#### Portfolio note\nCompare overlap alongside risk, fees, time horizon, and your existing asset allocation; low overlap alone does not make a fund suitable.`;
 
-  return `### 🎯 Personalized Mutual Fund Recommendation
+  return `### Personalized Mutual Fund Recommendation
 
-#### 1. Overlap Analysis & Fund Comparison
-- **Top Low-Overlap Recommendation**: **${topPick?.fundName || 'Nippon India Small Cap Fund'}**
-  - **Overlap with your portfolio**: **${topPick?.overlapPercentage || '8.5'}%** (Ultra Low Overlap)
-  - **Why this matters**: With only ${topPick?.overlapPercentage || '8.5'}% overlap, this fund introduces **${topPick?.newStocksCount || '18'} new companies** without duplicating your existing large-cap holdings.
-- **High-Overlap Caution**: Funds like **${highOverlapFunds[0]?.fundName || 'HDFC Top 100'}** share **${highOverlapFunds[0]?.overlapPercentage || '42'}% overlap**, which duplicates stocks you already own in your portfolio.
+#### Goal and profile
+- **Goal:** ${goal.label}${customGoalText && purpose !== 'custom_goal' ? ` — ${customGoalText}` : ''}
+- **Risk tolerance:** ${riskTolerance}
+- **Time horizon:** ${timeHorizon}
+- **Current funds considered:** ${currentFundNames.join(', ') || 'No active funds'}
+- ${alignmentNote}
 
-#### 2. Goal Alignment: ${riskTolerance === 'high' ? 'High Risk, High Reward (Small Cap Strategy)' : 'Balanced Growth Strategy'}
-${riskTolerance === 'high' 
-  ? `Since your purpose is **High Risk High Reward**, Small Cap funds are an ideal vehicle. Small-cap enterprises have higher growth potential and can generate market-beating returns over a 7-10 year horizon. However, they carry higher short-term volatility.`
-  : `Since your goal is steady wealth creation, a balanced mix with low portfolio duplication gives you optimal risk-adjusted returns.`}
+#### ${specificComparison ? 'Selected fund comparison' : 'Funds to review'}
+${recommendationText}
 
-#### 3. 📘 Beginner Guide: What You Need to Know
-- **What is Overlap?** Imagine buying two fruit baskets that both contain 80% apples and bananas. You pay two delivery charges for the same fruits. Similarly, high mutual fund overlap means you pay two management fees for the same underlying stocks!
-- **What is a Small Cap Fund?** Companies ranked 251st and beyond by market capitalization in India. They are smaller, dynamic businesses with substantial room to grow into mid or large caps.
-- **The Golden Rule**: Aim for portfolio additions with **under 20% overlap** to achieve genuine diversification.
+#### Overlap context
+- ${overlapCaution}
+- A fund's overlap percentage measures shared holding weight; use it with the other profile details rather than as the only selection criterion.
+${beginnerGuidance}
 
----
-*Disclaimer: Educational research recommendation based on mathematical overlap calculations. FolioScope is not a SEBI-registered advisor; you are responsible for your own investment decisions.*`;
+*Disclaimer: This is an educational, algorithmic analysis of your profile and portfolio data, not personalized financial advice. FolioScope is not a SEBI-registered advisor. Mutual fund investments are subject to market risks.*`;
 }

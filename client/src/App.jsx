@@ -8,19 +8,27 @@ import AddCustomFundModal from './components/AddCustomFundModal';
 import CasUploadModal from './components/CasUploadModal';
 import SetuAccountAggregatorModal from './components/SetuAccountAggregatorModal';
 import AIAdvisorView from './components/AIAdvisorView';
+import LandingPage from './components/LandingPage';
+import AuthPage from './components/AuthPage';
+
+const INITIAL_PORTFOLIO = [
+  { fundId: 'ppfas-flexi-cap', investmentAmount: 50000, weight: 0.5 },
+  { fundId: 'mirae-large-midcap', investmentAmount: 50000, weight: 0.5 }
+];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('simulator');
+  const [activeTab, setActiveTab] = useState('home');
   const [funds, setFunds] = useState([]);
   const [portfolios, setPortfolios] = useState([]);
   const [apiOnline, setApiOnline] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  // Default initial portfolio
-  const [currentPortfolio, setCurrentPortfolio] = useState([
-    { fundId: 'ppfas-flexi-cap', investmentAmount: 50000, weight: 0.5 },
-    { fundId: 'mirae-large-midcap', investmentAmount: 50000, weight: 0.5 }
-  ]);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authEnabled, setAuthEnabled] = useState(false);
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [user, setUser] = useState(null);
+  const [authNotice, setAuthNotice] = useState('');
+  const [logoutError, setLogoutError] = useState('');
+  const [currentPortfolio, setCurrentPortfolio] = useState(INITIAL_PORTFOLIO);
 
   // Prospective fund under evaluation
   const [prospectiveFundId, setProspectiveFundId] = useState('hdfc-top-100');
@@ -55,13 +63,42 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Fetch initial funds catalog and saved portfolios
+  // Restore authentication before requesting protected application data.
   useEffect(() => {
-    fetchInitialData();
+    let mounted = true;
+    const restoreSession = async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Could not check sign-in status.');
+        }
+        if (!mounted) return;
+        setAuthEnabled(Boolean(result.authEnabled));
+        setGoogleEnabled(Boolean(result.googleEnabled));
+        setUser(result.authenticated ? result.user : null);
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('authError') === 'google_not_configured') {
+          setAuthNotice('Google sign-in is not configured on the server yet.');
+        } else if (params.get('authError')) {
+          setAuthNotice('Google sign-in could not be completed. Please try again.');
+        }
+        if (params.has('auth') || params.has('authError')) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Authentication status check failed:', error);
+        if (mounted) setAuthNotice('Could not connect to the authentication service. Check that the server is running.');
+      } finally {
+        if (mounted) setAuthLoading(false);
+      }
+    };
+    restoreSession();
+    return () => { mounted = false; };
   }, []);
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  const fetchInitialData = useCallback(async () => {
     try {
       const [fundsRes, portfoliosRes] = await Promise.all([
         fetch('/api/funds'),
@@ -88,7 +125,11 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (user) fetchInitialData();
+  }, [user, fetchInitialData]);
 
   // Run simulation calculation
   const runSimulation = useCallback(async (targetProspectiveFundId, targetAmount) => {
@@ -176,6 +217,53 @@ export default function App() {
     alert(`Custom fund "${newFund.name}" successfully created and added to catalog!`);
   };
 
+  const handleAuthenticated = (authenticatedUser) => {
+    setLoading(true);
+    setUser(authenticatedUser);
+    setAuthNotice('');
+    setLogoutError('');
+    setCurrentPortfolio(INITIAL_PORTFOLIO);
+    setActiveTab('home');
+  };
+
+  const handleLogout = async () => {
+    setLogoutError('');
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Could not sign out.');
+      }
+      setUser(null);
+      setPortfolios([]);
+      setFunds([]);
+      setCurrentPortfolio([]);
+      setSimulationResult(null);
+    } catch (error) {
+      console.error('Sign-out failed:', error);
+      setLogoutError(error instanceof Error ? error.message : 'Could not sign out.');
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: 'var(--text-secondary)' }}>
+        Checking your FolioScope session...
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AuthPage
+        authEnabled={authEnabled}
+        googleEnabled={googleEnabled}
+        initialMessage={authNotice}
+        onAuthenticated={handleAuthenticated}
+      />
+    );
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       {/* Top Navigation Bar */}
@@ -189,6 +277,9 @@ export default function App() {
         onOpenSetuModal={() => setIsSetuModalOpen(true)}
         onLoadPreset={handleLoadPreset}
         portfolios={portfolios}
+        user={user}
+        onLogout={handleLogout}
+        logoutError={logoutError}
       />
 
       {/* Main View Area */}
@@ -211,6 +302,14 @@ export default function App() {
           </div>
         ) : (
           <>
+            {activeTab === 'home' && (
+              <LandingPage
+                onNavigate={setActiveTab}
+                fundsCount={funds.length}
+                apiOnline={apiOnline}
+              />
+            )}
+
             {activeTab === 'simulator' && (
               <SimulatorView
                 funds={funds}

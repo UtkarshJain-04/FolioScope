@@ -309,6 +309,14 @@ h4 {
   gap: 16px;
 }
 
+.header-logo {
+  display: block;
+  width: 125px;
+  height: auto;
+  flex: 0 0 auto;
+  object-fit: contain;
+}
+
 .brand-wrapper {
   display: flex;
   align-items: center;

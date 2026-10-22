@@ -155,20 +155,7 @@ export default function SimulatorView({
             <span>Download PDF Report</span>
           </button>
 
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              onRunSimulation(prospectiveFundId, prospectiveAmount);
-              handleCelebrateIfLow();
-            }}
-            id="btn-recalculate-simulation"
-            disabled={isSimulating}
-          >
-            <Sparkles size={16} />
-            <span>
-              {isSimulating ? 'Simulating...' : 'Recalculate Simulation'}
-            </span>
-          </button>
+
           {/* </div> */}
           <button
             className="btn btn-primary"
