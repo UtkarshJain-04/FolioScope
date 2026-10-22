@@ -2,6 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import './loadEnv.js';
+import dns from 'node:dns';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {
+  // ignore in older node versions
+}
 import multer from 'multer';
 import mongoose from 'mongoose';
 import passport from 'passport';
@@ -82,7 +89,7 @@ app.use('/api/auth', createAuthRouter({
   googleEnabled,
 }));
 app.use('/api', (req, res, next) => {
-  if (req.path === '/health' || req.path === '/setu/webhook' || req.path.startsWith('/auth/')) {
+  if (req.path === '/health' || req.path === '/setu/webhook' || req.path.startsWith('/auth/') || req.path.startsWith('/mfapi/')) {
     return next();
   }
   return authenticatedUser(req, res, next);
@@ -94,6 +101,63 @@ function getFundById(fundId) {
   if (custom) return custom;
   return mutualFunds.find(f => f.id === fundId);
 }
+
+// In-memory cache for MFapi data to provide sub-millisecond responses
+const mfapiCache = new Map();
+
+// MFapi scheme search endpoint
+app.get('/api/mfapi/search', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    if (!q) {
+      return res.json({ success: true, count: 0, data: [] });
+    }
+    const cacheKey = `search:${q.toLowerCase()}`;
+    if (mfapiCache.has(cacheKey)) {
+      const cached = mfapiCache.get(cacheKey);
+      return res.json({ success: true, count: cached.length, data: cached, cached: true });
+    }
+
+    const apiUrl = `https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`MFapi search failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    const results = Array.isArray(data) ? data : [];
+    mfapiCache.set(cacheKey, results);
+    res.json({ success: true, count: results.length, data: results });
+  } catch (error) {
+    console.error('[MFapi Search Proxy Error]:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// MFapi scheme details & historical NAV endpoint
+app.get('/api/mfapi/scheme/:code', async (req, res) => {
+  try {
+    const code = req.params.code;
+    if (!code) {
+      return res.status(400).json({ success: false, message: 'Scheme code is required' });
+    }
+    const cacheKey = `scheme:${code}`;
+    if (mfapiCache.has(cacheKey)) {
+      return res.json({ success: true, data: mfapiCache.get(cacheKey), cached: true });
+    }
+
+    const apiUrl = `https://api.mfapi.in/mf/${encodeURIComponent(code)}`;
+    const response = await fetch(apiUrl);
+    if (!response.ok) {
+      throw new Error(`MFapi details failed with status ${response.status}`);
+    }
+    const data = await response.json();
+    mfapiCache.set(cacheKey, data);
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('[MFapi Scheme Proxy Error]:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // 1. Get all mutual funds
 app.get('/api/funds', (req, res) => {
